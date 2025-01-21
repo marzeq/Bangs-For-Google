@@ -1,27 +1,68 @@
-let bangs = []
+/** @typedef {{
+  c: string,
+  d: string,
+  r: number,
+  s: string,
+  sc: string,
+  t: string,
+  u: string,
+}} Bang */
 
-;(async () => {
+/** @type {Map<string, Bang>} */
+const bangs = new Map()
+let maxBangLen = 0
+
+const fetchBangs = async () => {
   const res = await fetch("https://duckduckgo.com/bang.js")
-  bangs = await res.json()
-})()
+  const got = await res.json()
+
+  let maxLen = 0
+
+  for (const bang of got) {
+    bangs.set(bang.t, bang)
+    if (bang.t.length > maxLen) {
+      maxLen = bang.t.length
+    }
+  }
+
+  maxBangLen = maxLen
+}
+
+const fetchPromise = fetchBangs()
 
 chrome.webRequest.onBeforeRequest.addListener(
-  ({ url }) => {
+  async ({ url }) => {
+    await fetchPromise
+
     const urlObj = new URL(url)
     const query = urlObj.searchParams.get("q")
 
-    if (
-      query &&
-      query.includes("!") &&
-      bangs.some(bang => {
-        const bangStartIdx = query.indexOf(`!${bang.t}`)
-        const prevCharIdx = bangStartIdx - 1
-        const nextCharIdx = bangStartIdx + bang.t.length + 1
-        return bangStartIdx > -1 && (nextCharIdx === query.length || query[nextCharIdx] === " ") && (prevCharIdx === -1 || query[prevCharIdx] === " ")
-      })
-    ) {
+    if (!query.includes("!")) return
+
+    if (query.lastIndexOf("!") == query.length - 1) return
+
+    if (query.indexOf("!") == 0) {
+      let bangTag = ""
+
+      const start = Math.min(maxBangLen, query.length)
+      for (let i = start - 1; i >= 0; i--) {
+        bangTag = query.substring(1, 1 + i)
+
+        if (bangs.has(bangTag)) break
+      }
+
+      if (!bangs.has(bangTag)) return
+
       return {
-        redirectUrl: `https://www.duckduckgo.com/?q=${encodeURIComponent(query)}`
+        redirectUrl: bangs.get(bangTag).u.replace("{{{s}}}", query.slice(bangTag.length + 1))
+      }
+    } else {
+      const bangTag = query.substring(1 + query.lastIndexOf("!"))
+
+      if (!bangs.has(bangTag)) return
+
+      return {
+        redirectUrl: bangs.get(bangTag).u.replace("{{{s}}}", query.slice(0, -bangTag.length - 1))
       }
     }
   },
@@ -86,81 +127,6 @@ chrome.webRequest.onBeforeRequest.addListener(
     ]
   },
   [
-    "blocking" // Needed so we can redirect the request to DuckDuckGo - we aren't really blocking anything
+    "blocking" // needed so we can redirect the request to the websites - we aren't really blocking anything
   ]
 )
-
-chrome.omnibox.onInputChanged.addListener((text, addSuggestions) => {
-  let filterText = text.trim()
-  if (filterText.indexOf("!") === 0) {
-    filterText = filterText.substr(1)
-  }
-
-  chrome.omnibox.setDefaultSuggestion({
-    description: "Use Bang"
-  })
-
-  let results = []
-
-  for (let bang of bangs) {
-    if (bang.t.startsWith(filterText) || bang.s.includes(filterText) || bang.d.includes(filterText)) {
-      let lengthRelevance = 10 - bang.t.length
-      if (lengthRelevance > 0) {
-        lengthRelevance = 0
-      }
-
-      let typeRelevance = 0
-      if (bang.t === filterText) {
-        chrome.omnibox.setDefaultSuggestion({
-          description: `!${bang.t} (${bang.s})`
-        })
-        continue
-      } else if (bang.t.startsWith(filterText)) {
-        typeRelevance = 100
-      } else if (bang.s.includes(filterText)) {
-        typeRelevance = 2
-      }
-
-      const relevance = lengthRelevance + typeRelevance + bang.r
-
-      results.push({
-        content: bang.t,
-        description: `!${bang.t} (${bang.s}), Rel: ${relevance}`,
-        relevance
-      })
-    }
-  }
-
-  results = results
-    .sort((a, b) => b.relevance - a.relevance)
-    .slice(0, 10)
-    .map(item => {
-      return {
-        content: item.content,
-        description: item.description
-      }
-    })
-
-  addSuggestions(results)
-})
-
-chrome.omnibox.onInputEntered.addListener((text, disposition) => {
-  let bang = text.trim()
-  if (bang.indexOf("!") === 0) {
-    bang = bang.substr(1)
-  }
-
-  const url = `https://www.duckduckgo.com/?q=${encodeURIComponent(`!${bang}`)}`
-
-  switch (disposition) {
-    case "currentTab":
-      chrome.tabs.update({ url })
-      break
-    case "newForegroundTab":
-      chrome.tabs.create({ url })
-      break
-    case "newBackgroundTab":
-      chrome.tabs.create({ url, active: false })
-      break
-  }
-})
