@@ -53,17 +53,19 @@ chrome.webRequest.onBeforeRequest.addListener(
 
       if (!bangs.has(bangTag)) return
 
-      return {
-        redirectUrl: bangs.get(bangTag).u.replace("{{{s}}}", query.slice(bangTag.length + 1))
+      const got = bangs.get(bangTag)
+
+      if (bangTag.length + 1 == query.length) {
+        return { redirectUrl: `https://${got.d}` }
+      } else {
+        return { redirectUrl: bangs.get(bangTag).u.replace("{{{s}}}", query.slice(bangTag.length + 1)) }
       }
     } else {
       const bangTag = query.substring(1 + query.lastIndexOf("!"))
 
       if (!bangs.has(bangTag)) return
 
-      return {
-        redirectUrl: bangs.get(bangTag).u.replace("{{{s}}}", query.slice(0, -bangTag.length - 1))
-      }
+      return { redirectUrl: bangs.get(bangTag).u.replace("{{{s}}}", query.slice(0, -bangTag.length - 1)) }
     }
   },
   {
