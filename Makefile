@@ -1,12 +1,11 @@
 EXTENSION_NAME = extension
-EXTENSION_DIR = .
 SRC_DIR = src
 DIST_DIR = dist
 OUTPUT_DIR = build
+ICONS_DIR = icons
 
+MANIFEST_FILE = manifest.json
 XPI_FILE = $(OUTPUT_DIR)/$(EXTENSION_NAME).xpi
-MANIFEST_FILE = $(EXTENSION_DIR)/manifest.json
-ICONS_DIR = $(EXTENSION_DIR)/icons
 ICON_FILES = $(wildcard $(ICONS_DIR)/*)
 SRC_FILES = $(wildcard $(SRC_DIR)/*.ts)
 JS_FILES = $(patsubst $(SRC_DIR)/%.ts,$(DIST_DIR)/%.js,$(SRC_FILES))
