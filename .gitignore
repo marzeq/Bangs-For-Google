@@ -2,3 +2,5 @@
 *.zip
 *.txt
 build
+dist
+node_modules

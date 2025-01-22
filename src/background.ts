@@ -1,15 +1,14 @@
-/** @typedef {{
-  c: string,
-  d: string,
-  r: number,
-  s: string,
-  sc: string,
-  t: string,
-  u: string,
-}} Bang */
+type Bang = {
+  c: string
+  d: string
+  r: number
+  s: string
+  sc: string
+  t: string
+  u: string
+}
 
-/** @type {Map<string, Bang>} */
-const bangs = new Map()
+const bangs = new Map<string, Bang>()
 let maxBangLen = 0
 
 const fetchBangs = async () => {
@@ -31,13 +30,14 @@ const fetchBangs = async () => {
 const fetchPromise = fetchBangs()
 
 chrome.webRequest.onBeforeRequest.addListener(
+  /// @ts-expect-error
   async ({ url }) => {
     await fetchPromise
 
     const urlObj = new URL(url)
     const query = urlObj.searchParams.get("q")
 
-    if (!query.includes("!")) return
+    if (!query || !query.includes("!")) return
 
     if (query.lastIndexOf("!") == query.length - 1) return
 
@@ -51,21 +51,23 @@ chrome.webRequest.onBeforeRequest.addListener(
         if (bangs.has(bangTag)) break
       }
 
-      if (!bangs.has(bangTag)) return
-
       const got = bangs.get(bangTag)
+
+      if (!got) return
 
       if (bangTag.length + 1 == query.length) {
         return { redirectUrl: `https://${got.d}` }
       } else {
-        return { redirectUrl: bangs.get(bangTag).u.replace("{{{s}}}", query.slice(bangTag.length + 1)) }
+        return { redirectUrl: got.u.replace("{{{s}}}", query.slice(bangTag.length + 1)) }
       }
     } else {
       const bangTag = query.substring(1 + query.lastIndexOf("!"))
 
-      if (!bangs.has(bangTag)) return
+      const got = bangs.get(bangTag)
 
-      return { redirectUrl: bangs.get(bangTag).u.replace("{{{s}}}", query.slice(0, -bangTag.length - 1)) }
+      if (!got) return
+
+      return { redirectUrl: got.u.replace("{{{s}}}", query.slice(0, -bangTag.length - 1)) }
     }
   },
   {
